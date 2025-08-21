@@ -43,7 +43,7 @@ This is the fastest way to get up and running!
 
 To avoid losing your progress, be sure to **commit your changes regularly** — just like shown in the video demo below — so your updates are saved to your forked repository.
 
-(TBA)
+https://github.com/user-attachments/assets/dd452ea1-3070-4718-af34-bea978e208ab
 
 ## Project Structure Simplified
 
