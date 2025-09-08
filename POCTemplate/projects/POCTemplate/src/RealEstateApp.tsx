@@ -3,6 +3,9 @@ import { Wallet, Shield, Users, TrendingUp, Home, CheckCircle, AlertCircle } fro
 import { useWallet } from '@txnlab/use-wallet-react'
 import ConnectWallet from './components/ConnectWallet'
 import PropertyListing from './components/PropertyListing'
+import { algo, AlgorandClient } from '@algorandfoundation/algokit-utils'
+import { getAlgodConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
+
 
 
 
@@ -52,6 +55,9 @@ const RealEstateApp: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [notifications, setNotifications] = useState<Array<{id: number, type: 'success' | 'error', message: string}>>([]);
   const [activeTab, setActiveTab] = useState<'marketplace' | 'analytics' | 'about'>('marketplace');
+  const algodConfig = getAlgodConfigFromViteEnvironment()
+const algorand = AlgorandClient.fromConfig({ algodConfig })
+
 
   
   
@@ -124,22 +130,41 @@ const RealEstateApp: React.FC = () => {
     }
   };
 
-  const handleMakeOffer = async (propertyId: number, amount: number) => {
-    setIsLoading(true);
-    try {
-      const txId = await mockRealEstateContract.makeOffer();
-      
-      setProperties(prev => 
-        prev.map(p => p.id === propertyId ? { ...p, status: 'pending' as const } : p)
-      );
-      
-      addNotification('success', `Offer submitted! Transaction: ${txId}`);
-    } catch (error: any) {
-      addNotification('error', `Failed to make offer: ${error.message}`);
-    } finally {
-      setIsLoading(false);
+    const handleMakeOffer = async (propertyId: number) => {
+  setIsLoading(true);
+  try {
+    const property = properties.find(p => p.id === propertyId);
+    if (!property) throw new Error("Property not found");
+
+    if (!transactionSigner || !activeAddress) {
+      addNotification('error', "Please connect your wallet first");
+      return;
     }
-  };
+
+    // Send ALGO directly to seller
+    const result = await algorand.send.payment({
+      signer: transactionSigner,
+      sender: activeAddress,
+      receiver: property.seller,
+      amount: algo(property.price / 1e6), // convert microALGO → ALGO
+    });
+
+    // Mark property as pending
+    setProperties(prev =>
+      prev.map(p =>
+        p.id === propertyId ? { ...p, status: 'pending' as const } : p
+      )
+    );
+
+    addNotification('success', `Offer submitted for ${property.price / 1e6} ALGO! Tx: ${result.txIds[0]}`);
+  } catch (error: any) {
+    addNotification('error', `Failed to make offer: ${error.message}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+
 
   const handleConfirmTransfer = async (propertyId: number) => {
     setIsLoading(true);
@@ -187,7 +212,7 @@ const RealEstateApp: React.FC = () => {
     walletConnected={!!activeAddress}  // <-- update here
     userAddress={activeAddress || ''}  // <-- update here
     onCreateListing={handleCreateListing}
-    onMakeOffer={handleMakeOffer}
+    onMakeOffer={(propertyId) => handleMakeOffer(propertyId)}
     onConfirmTransfer={handleConfirmTransfer}
     onCancelDeal={handleCancelDeal}
     properties={properties}
