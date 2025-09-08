@@ -3,9 +3,6 @@ import { Wallet, Shield, Users, TrendingUp, Home, CheckCircle, AlertCircle } fro
 import { useWallet } from '@txnlab/use-wallet-react'
 import ConnectWallet from './components/ConnectWallet'
 import PropertyListing from './components/PropertyListing'
-import { algo, AlgorandClient } from '@algorandfoundation/algokit-utils'
-import { getAlgodConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
-
 
 
 
@@ -55,9 +52,6 @@ const RealEstateApp: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [notifications, setNotifications] = useState<Array<{id: number, type: 'success' | 'error', message: string}>>([]);
   const [activeTab, setActiveTab] = useState<'marketplace' | 'analytics' | 'about'>('marketplace');
-  const algodConfig = getAlgodConfigFromViteEnvironment()
-const algorand = AlgorandClient.fromConfig({ algodConfig })
-
 
   
   
@@ -130,41 +124,22 @@ const algorand = AlgorandClient.fromConfig({ algodConfig })
     }
   };
 
-    const handleMakeOffer = async (propertyId: number) => {
-  setIsLoading(true);
-  try {
-    const property = properties.find(p => p.id === propertyId);
-    if (!property) throw new Error("Property not found");
-
-    if (!transactionSigner || !activeAddress) {
-      addNotification('error', "Please connect your wallet first");
-      return;
+  const handleMakeOffer = async (propertyId: number, amount: number) => {
+    setIsLoading(true);
+    try {
+      const txId = await mockRealEstateContract.makeOffer();
+      
+      setProperties(prev => 
+        prev.map(p => p.id === propertyId ? { ...p, status: 'pending' as const } : p)
+      );
+      
+      addNotification('success', `Offer submitted! Transaction: ${txId}`);
+    } catch (error: any) {
+      addNotification('error', `Failed to make offer: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
-
-    // Send ALGO directly to seller
-    const result = await algorand.send.payment({
-      signer: transactionSigner,
-      sender: activeAddress,
-      receiver: property.seller,
-      amount: algo(property.price / 1e6), // convert microALGO → ALGO
-    });
-
-    // Mark property as pending
-    setProperties(prev =>
-      prev.map(p =>
-        p.id === propertyId ? { ...p, status: 'pending' as const } : p
-      )
-    );
-
-    addNotification('success', `Offer submitted for ${property.price / 1e6} ALGO! Tx: ${result.txIds[0]}`);
-  } catch (error: any) {
-    addNotification('error', `Failed to make offer: ${error.message}`);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-
+  };
 
   const handleConfirmTransfer = async (propertyId: number) => {
     setIsLoading(true);
@@ -188,16 +163,27 @@ const algorand = AlgorandClient.fromConfig({ algodConfig })
   try {
     const txId = await mockRealEstateContract.cancelDeal();
 
-    // Temporarily mark property as cancelled
-    setCancelledProperties(prev => [...prev, propertyId]);
+    const property = properties.find(p => p.id === propertyId);
+    if (!property) throw new Error('Property not found');
 
-    addNotification('success', `Deal cancelled! Funds returned. Transaction: ${txId}`);
+    if (property.seller === activeAddress) {
+      // Seller cancels → remove property after showing highlight
+      setCancelledProperties(prev => [...prev, propertyId]);
+      addNotification('success', `Deal cancelled by seller! Transaction: ${txId}`);
 
-    // Remove property after 2 seconds so user sees the highlight
-    setTimeout(() => {
-      setProperties(prev => prev.filter(p => p.id !== propertyId));
-      setCancelledProperties(prev => prev.filter(id => id !== propertyId));
-    }, 2000);
+      setTimeout(() => {
+        setProperties(prev => prev.filter(p => p.id !== propertyId));
+        setCancelledProperties(prev => prev.filter(id => id !== propertyId));
+      }, 2000);
+    } else {
+      // Buyer cancels → keep property listed
+      setProperties(prev =>
+        prev.map(p =>
+          p.id === propertyId ? { ...p, status: 'listed' as const } : p
+        )
+      );
+      addNotification('success', `Deal cancelled by buyer. Property remains listed. Transaction: ${txId}`);
+    }
 
   } catch (error: any) {
     addNotification('error', `Failed to cancel deal: ${error.message}`);
@@ -207,12 +193,13 @@ const algorand = AlgorandClient.fromConfig({ algodConfig })
 };
 
 
+
   const MarketplaceTab = () => (
   <PropertyListing
     walletConnected={!!activeAddress}  // <-- update here
     userAddress={activeAddress || ''}  // <-- update here
     onCreateListing={handleCreateListing}
-    onMakeOffer={(propertyId) => handleMakeOffer(propertyId)}
+    onMakeOffer={handleMakeOffer}
     onConfirmTransfer={handleConfirmTransfer}
     onCancelDeal={handleCancelDeal}
     properties={properties}
