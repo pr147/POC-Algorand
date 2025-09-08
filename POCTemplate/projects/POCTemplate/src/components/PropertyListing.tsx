@@ -43,7 +43,6 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
 }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [offerAmount, setOfferAmount] = useState('');
   const [showPriceAnalytics, setShowPriceAnalytics] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -101,21 +100,21 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
   };
 
   const handleMakeOffer = async (property: Property) => {
-    if (!offerAmount || !property.id) {
-      alert('Please enter an offer amount');
-      return;
-    }
+  if (!property.id) {
+    alert('Invalid property');
+    return;
+  }
 
-    try {
-      const offerInMicroAlgos = parseInt(offerAmount) * 1000000;
-      await onMakeOffer(property.id, offerInMicroAlgos);
-      setOfferAmount('');
-      setSelectedProperty(null);
-    } catch (error) {
-      console.error('Error making offer:', error);
-      alert('Error making offer. Please try again.');
-    }
-  };
+  try {
+    const offerInMicroAlgos = property.price; // use property price directly
+    await onMakeOffer(property.id, offerInMicroAlgos);
+    setSelectedProperty(null);
+  } catch (error) {
+    console.error('Error making offer:', error);
+    alert('Error making offer. Please try again.');
+  }
+};
+
 
   const formatPrice = (microAlgos: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -379,65 +378,56 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-3">
-                {property.seller === userAddress ? (
-                  // Seller actions
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => onConfirmTransfer(property.id!)}
-                      disabled={property.status !== 'pending' || isLoading}
-                      className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-                    >
-                      {property.status === 'pending' ? 'Confirm Transfer & Release Funds' : 'Waiting for Buyer'}
-                    </button>
-                    <button
-                      onClick={() => onCancelDeal(property.id!)}
-                      disabled={property.status === 'sold' || isLoading}
-                      className="w-full py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Cancel Deal
-                    </button>
-                  </div>
-                ) : (
-                  // Buyer actions
-                  <div className="space-y-2">
-                    {property.status === 'listed' && (
-                      <div>
-                        <input
-                          type="number"
-                          placeholder="Offer amount (ALGO)"
-                          value={selectedProperty?.id === property.id ? offerAmount : ''}
-                          onChange={(e) => {
-                            setOfferAmount(e.target.value);
-                            setSelectedProperty(property);
-                          }}
-                          className="w-full p-2 border border-gray-300 rounded-lg mb-2"
-                        />
-                        <button
-                          onClick={() => handleMakeOffer(property)}
-                          disabled={isLoading || !offerAmount}
-                          className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-                        >
-                          Make Offer & Deposit Funds
-                        </button>
-                      </div>
-                    )}
-                    {property.status === 'pending' && (
-                      <div className="text-center py-4">
-                        <p className="text-yellow-600 font-semibold">⏳ Offer Pending</p>
-                        <p className="text-sm text-gray-500">Waiting for seller confirmation</p>
-                        <button
-                          onClick={() => onCancelDeal(property.id!)}
-                          disabled={isLoading}
-                          className="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
-                        >
-                          Cancel My Offer
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+<div className="space-y-3">
+  {property.seller === userAddress ? (
+    // Seller actions (only if not sold)
+    property.status !== 'sold' && (
+      <div className="space-y-2">
+        <button
+          onClick={() => onConfirmTransfer(property.id!)}
+          disabled={property.status !== 'pending' || isLoading}
+          className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+        >
+          {property.status === 'pending' ? 'Confirm Transfer & Release Funds' : 'Waiting for Buyer'}
+        </button>
+        <button
+          onClick={() => onCancelDeal(property.id!)}
+          disabled={property.status === 'pending' || property.status === 'sold' || isLoading}
+          className="w-full py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Cancel Deal
+        </button>
+      </div>
+    )
+  ) : (
+    // Buyer actions
+    <div className="space-y-2">
+      {property.status === 'listed' && (
+        <button
+          onClick={() => handleMakeOffer(property)}
+          disabled={isLoading}
+          className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+        >
+          Make Offer & Deposit Funds
+        </button>
+      )}
+      {property.status === 'pending' && (
+        <div className="text-center py-4">
+          <p className="text-yellow-600 font-semibold">⏳ Offer Pending</p>
+          <p className="text-sm text-gray-500">Waiting for seller confirmation</p>
+          <button
+            onClick={() => onCancelDeal(property.id!)}
+            disabled={isLoading}
+            className="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+          >
+            Cancel My Offer
+          </button>
+        </div>
+      )}
+    </div>
+  )}
+</div>
+
             </div>
           </div>
         ))}
