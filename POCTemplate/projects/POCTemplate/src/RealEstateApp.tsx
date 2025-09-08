@@ -2,16 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Wallet, Shield, Users, TrendingUp, Home, CheckCircle, AlertCircle } from 'lucide-react';
 import { useWallet } from '@txnlab/use-wallet-react'
 import ConnectWallet from './components/ConnectWallet'
+import PropertyListing from './components/PropertyListing'
 
-// Mock components - replace with actual imports in your project
-const PropertyListing = ({ walletConnected, userAddress, onCreateListing, onMakeOffer, onConfirmTransfer, onCancelDeal, properties, isLoading }: any) => (
-  <div className="text-center py-8">
-    <Home className="w-16 h-16 mx-auto text-blue-500 mb-4" />
-    <p className="text-gray-600">Property Listing Component would be imported here</p>
-    <p className="text-sm text-gray-500 mt-2">Connected: {walletConnected ? 'Yes' : 'No'}</p>
-    {userAddress && <p className="text-sm text-gray-500">Address: {userAddress}</p>}
-  </div>
-);
+
 
 // Mock services - replace with actual imports
 const mockWalletService = {
@@ -48,20 +41,20 @@ interface Property {
 }
 
 const RealEstateApp: React.FC = () => {
-  const [walletConnected, setWalletConnected] = useState(false);
   const [openWalletModal, setOpenWalletModal] = useState(false);
+  const [cancelledProperties, setCancelledProperties] = useState<number[]>([]);
+
   
   const [openPaymentModal, setOpenPaymentModal] = useState(false);
   const { activeAddress, transactionSigner } = useWallet();
   const toggleWalletModal = () => setOpenWalletModal(!openWalletModal);
-  const [userAddress, setUserAddress] = useState('');
-  const [userBalance, setUserBalance] = useState(0);
-  const [walletType, setWalletType] = useState<'pera' | 'algosigner' | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [notifications, setNotifications] = useState<Array<{id: number, type: 'success' | 'error', message: string}>>([]);
   const [activeTab, setActiveTab] = useState<'marketplace' | 'analytics' | 'about'>('marketplace');
 
+  
+  
   // Mock data for initial properties
   useEffect(() => {
     const mockProperties: Property[] = [
@@ -119,7 +112,7 @@ const RealEstateApp: React.FC = () => {
         ...property,
         id: Date.now(),
         contractAddress,
-        seller: userAddress
+        seller: activeAddress
       };
       
       setProperties(prev => [...prev, newProperty]);
@@ -166,34 +159,43 @@ const RealEstateApp: React.FC = () => {
   };
 
   const handleCancelDeal = async (propertyId: number) => {
-    setIsLoading(true);
-    try {
-      const txId = await mockRealEstateContract.cancelDeal();
-      
-      setProperties(prev => 
-        prev.map(p => p.id === propertyId ? { ...p, status: 'listed' as const } : p)
-      );
-      
-      addNotification('success', `Deal cancelled! Funds returned. Transaction: ${txId}`);
-    } catch (error: any) {
-      addNotification('error', `Failed to cancel deal: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  setIsLoading(true);
+  try {
+    const txId = await mockRealEstateContract.cancelDeal();
+
+    // Temporarily mark property as cancelled
+    setCancelledProperties(prev => [...prev, propertyId]);
+
+    addNotification('success', `Deal cancelled! Funds returned. Transaction: ${txId}`);
+
+    // Remove property after 2 seconds so user sees the highlight
+    setTimeout(() => {
+      setProperties(prev => prev.filter(p => p.id !== propertyId));
+      setCancelledProperties(prev => prev.filter(id => id !== propertyId));
+    }, 2000);
+
+  } catch (error: any) {
+    addNotification('error', `Failed to cancel deal: ${error.message}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const MarketplaceTab = () => (
-    <PropertyListing
-      walletConnected={walletConnected}
-      userAddress={userAddress}
-      onCreateListing={handleCreateListing}
-      onMakeOffer={handleMakeOffer}
-      onConfirmTransfer={handleConfirmTransfer}
-      onCancelDeal={handleCancelDeal}
-      properties={properties}
-      isLoading={isLoading}
-    />
-  );
+  <PropertyListing
+    walletConnected={!!activeAddress}  // <-- update here
+    userAddress={activeAddress || ''}  // <-- update here
+    onCreateListing={handleCreateListing}
+    onMakeOffer={handleMakeOffer}
+    onConfirmTransfer={handleConfirmTransfer}
+    onCancelDeal={handleCancelDeal}
+    properties={properties}
+    cancelledProperties={cancelledProperties}
+    isLoading={isLoading}
+  />
+);
+
 
   const AnalyticsTab = () => (
     <div className="max-w-4xl mx-auto p-6">
@@ -379,46 +381,17 @@ const RealEstateApp: React.FC = () => {
               </div>
             </div>
 
-            {/* Wallet Section */}
-            <div className="flex items-center space-x-4">
-              {walletConnected ? (
-                <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-700">
-                      {mockWalletService.formatAddress(userAddress)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {mockWalletService.formatAlgoAmount(userBalance)} ALGO
-                    </p>
-                  </div>
-                  <button
-                    onClick={disconnectWallet}
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    Disconnect
-                  </button>
-                </div>
-              ) : (
-                <div className="flex space-x-2">
-                  <button
-                    onClick={toggleWalletModal}
-                    disabled={isLoading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center space-x-2"
-                  >
-                    {activeAddress ? 'Wallet Connected ✅' : 'Connect Wallet'}
-                    <Wallet className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => connectWallet('algosigner')}
-                    disabled={isLoading}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center space-x-2"
-                  >
-                    <Wallet className="w-4 h-4" />
-                    <span>AlgoSigner</span>
-                  </button>
-                </div>
-              )}
-            </div>
+          {/* Wallet Section */}
+<div className="flex items-center space-x-4">
+  <button
+    onClick={toggleWalletModal}
+    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2"
+  >
+    {activeAddress ? 'Wallet Connected ✅' : 'Connect Wallet'}
+    <Wallet className="w-4 h-4" />
+  </button>
+</div>
+
           </div>
 
           {/* Navigation Tabs */}

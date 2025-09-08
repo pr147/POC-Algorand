@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Home, MapPin, DollarSign, Calendar, User, Shield, TrendingUp } from 'lucide-react';
+import { Property } from '../types/Property';
 
 // Mock data for pricing analytics
 const mockPriceHistory = [
@@ -17,23 +18,6 @@ const mockComparableProperties = [
   { id: 3, price: 465000, sqft: 1950, location: '0.3 miles away' },
 ];
 
-interface Property {
-  id?: number;
-  title: string;
-  location: string;
-  price: number;
-  sqft: number;
-  bedrooms: number;
-  bathrooms: number;
-  description: string;
-  images: string[];
-  seller: string;
-  documentHash: string;
-  contractAddress?: number;
-  status: 'listed' | 'pending' | 'sold';
-  listingDate: string;
-}
-
 interface PropertyListingProps {
   walletConnected: boolean;
   userAddress: string;
@@ -43,6 +27,7 @@ interface PropertyListingProps {
   onCancelDeal: (propertyId: number) => Promise<void>;
   properties: Property[];
   isLoading: boolean;
+  cancelledProperties?: number[]; // <-- add this
 }
 
 const PropertyListing: React.FC<PropertyListingProps> = ({
@@ -53,7 +38,8 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
   onConfirmTransfer,
   onCancelDeal,
   properties,
-  isLoading
+  isLoading,
+  cancelledProperties = [] // <-- default empty array
 }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -78,7 +64,6 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
       return;
     }
 
-    // Generate mock document hash (in real app, this would be actual document hash)
     const documentHash = `doc_hash_${Date.now()}`;
     
     const newProperty: Property = {
@@ -209,6 +194,7 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h2 className="text-3xl font-bold text-gray-800 flex items-center">
@@ -314,7 +300,12 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
       {/* Properties Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {properties.map((property) => (
-          <div key={property.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
+          <div key={property.id} className={`border rounded-lg overflow-hidden shadow-lg transition-shadow hover:shadow-xl ${
+  property.id && cancelledProperties.includes(property.id)
+    ? 'bg-red-100 border-red-400'
+    : 'bg-white border-gray-200'
+}`}
+>
             <div className="h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white">
               <Home className="w-16 h-16 opacity-50" />
             </div>
@@ -453,26 +444,10 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
       </div>
 
       {properties.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
+        <div className="text-center py-12 bg-gray-50 rounded-lg mt-6">
           <Home className="w-16 h-16 mx-auto text-gray-400 mb-4" />
           <h3 className="text-xl font-semibold text-gray-700 mb-2">No Properties Listed</h3>
-          <p className="text-gray-500 mb-4">Be the first to list a property on our trustless platform</p>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-          >
-            List Your Property
-          </button>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {isLoading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-700">Processing transaction on Algorand...</p>
-          </div>
+          <p className="text-gray-500">Be the first to list a property on the platform</p>
         </div>
       )}
     </div>
