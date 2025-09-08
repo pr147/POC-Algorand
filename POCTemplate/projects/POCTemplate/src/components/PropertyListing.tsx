@@ -305,6 +305,7 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
     : 'bg-white border-gray-200'
 }`}
 >
+            
             <div className="h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white">
               <Home className="w-16 h-16 opacity-50" />
             </div>
