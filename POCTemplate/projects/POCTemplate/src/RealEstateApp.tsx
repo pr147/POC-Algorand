@@ -5,7 +5,7 @@ import ConnectWallet from './components/ConnectWallet'
 import PropertyListing from './components/PropertyListing'
 import { algo, AlgorandClient } from '@algorandfoundation/algokit-utils'
 import { getAlgodConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
-
+import { formatDistanceToNow } from 'date-fns';
 
 
 
@@ -52,6 +52,18 @@ const RealEstateApp: React.FC = () => {
   const { activeAddress, transactionSigner } = useWallet();
   const toggleWalletModal = () => setOpenWalletModal(!openWalletModal);
   const [properties, setProperties] = useState<Property[]>([]);
+
+// Initial mock analytics values
+const [totalVolumeInAlgo, setTotalVolumeInAlgo] = useState(1175000); // 1,175,000 ALGO
+const [propertiesSoldCount, setPropertiesSoldCount] = useState(23);
+const [avgPriceInAlgo, setAvgPriceInAlgo] = useState(511000);
+
+// Optional: fake percentage changes for demo
+const totalVolumeChange = 12;
+const propertiesSoldChange = 8;
+const avgPriceChange = 5;
+
+
   const [isLoading, setIsLoading] = useState(false);
   const [notifications, setNotifications] = useState<Array<{id: number, type: 'success' | 'error', message: string}>>([]);
   const [activeTab, setActiveTab] = useState<'marketplace' | 'analytics' | 'about'>('marketplace');
@@ -117,7 +129,8 @@ const RealEstateApp: React.FC = () => {
         ...property,
         id: Date.now(),
         contractAddress,
-        seller: activeAddress
+        seller: activeAddress,
+        listingDate: new Date().toISOString() // <-- add this
       };
       
       setProperties(prev => [...prev, newProperty]);
@@ -172,6 +185,20 @@ const RealEstateApp: React.FC = () => {
       setProperties(prev => 
         prev.map(p => p.id === propertyId ? { ...p, status: 'sold' as const } : p)
       );
+      // Find sold property
+    const soldProperty = properties.find(p => p.id === propertyId);
+    if (soldProperty) {
+      // Update cumulative analytics
+      setTotalVolumeInAlgo(prev => prev + soldProperty.price / 1e6);
+      setPropertiesSoldCount(prev => prev + 1);
+
+      // Update average price
+      setAvgPriceInAlgo(prevAvg => {
+        const totalSold = propertiesSoldCount + 1;
+        const totalVolume = (prevAvg * propertiesSoldCount) + (soldProperty.price / 1e6);
+        return totalVolume / totalSold;
+      });
+    }
       
       addNotification('success', `Transfer confirmed! Funds released. Transaction: ${txId}`);
     } catch (error: any) {
@@ -240,51 +267,84 @@ const RealEstateApp: React.FC = () => {
       </h3>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-100 p-6 rounded-lg border border-blue-200">
-          <h4 className="font-semibold text-blue-800 mb-2">Total Volume</h4>
-          <p className="text-3xl font-bold text-blue-600">1,175,000 ALGO</p>
-          <p className="text-sm text-blue-500">+12% this month</p>
-        </div>
-        
-        <div className="bg-gradient-to-br from-green-50 to-emerald-100 p-6 rounded-lg border border-green-200">
-          <h4 className="font-semibold text-green-800 mb-2">Properties Sold</h4>
-          <p className="text-3xl font-bold text-green-600">23</p>
-          <p className="text-sm text-green-500">+8% this month</p>
-        </div>
-        
-        <div className="bg-gradient-to-br from-purple-50 to-violet-100 p-6 rounded-lg border border-purple-200">
-          <h4 className="font-semibold text-purple-800 mb-2">Avg Price</h4>
-          <p className="text-3xl font-bold text-purple-600">511,000 ALGO</p>
-          <p className="text-sm text-purple-500">+5% this month</p>
-        </div>
-      </div>
+  {/* Total Volume */}
+  <div className="bg-gradient-to-br from-blue-50 to-indigo-100 p-6 rounded-lg border border-blue-200">
+    <h4 className="font-semibold text-blue-800 mb-2">Total Volume</h4>
+    <p className="text-3xl font-bold text-blue-600">
+      {totalVolumeInAlgo !== undefined
+        ? totalVolumeInAlgo.toLocaleString()
+        : '1,175,000'} ALGO
+    </p>
+    <p className="text-sm text-blue-500">
+      {totalVolumeChange !== undefined
+        ? `+${totalVolumeChange.toFixed(0)}% this month`
+        : '+12% this month'}
+    </p>
+  </div>
+
+  {/* Properties Sold */}
+  <div className="bg-gradient-to-br from-green-50 to-emerald-100 p-6 rounded-lg border border-green-200">
+    <h4 className="font-semibold text-green-800 mb-2">Properties Sold</h4>
+    <p className="text-3xl font-bold text-green-600">
+      {propertiesSoldCount !== undefined
+        ? propertiesSoldCount.toLocaleString()
+        : '23'}
+    </p>
+    <p className="text-sm text-green-500">
+      {propertiesSoldChange !== undefined
+        ? `+${propertiesSoldChange.toFixed(0)}% this month`
+        : '+8% this month'}
+    </p>
+  </div>
+
+  {/* Avg Price */}
+  <div className="bg-gradient-to-br from-purple-50 to-violet-100 p-6 rounded-lg border border-purple-200">
+    <h4 className="font-semibold text-purple-800 mb-2">Avg Price</h4>
+    <p className="text-3xl font-bold text-purple-600">
+      {avgPriceInAlgo !== undefined
+        ? avgPriceInAlgo.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '511,000.00'} ALGO
+    </p>
+    <p className="text-sm text-purple-500">
+      {avgPriceChange !== undefined
+        ? `+${avgPriceChange.toFixed(0)}% this month`
+        : '+5% this month'}
+    </p>
+  </div>
+</div>
+
+
+
 
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h4 className="text-lg font-semibold mb-4">Recent Transaction Activity</h4>
-        <div className="space-y-4">
-          {[
-            { property: "Downtown Condo", price: "750K ALGO", status: "Sold", time: "2 hours ago" },
-            { property: "Suburban Home", price: "425K ALGO", status: "Pending", time: "5 hours ago" },
-            { property: "City Apartment", price: "320K ALGO", status: "Listed", time: "1 day ago" },
-          ].map((tx, index) => (
-            <div key={index} className="flex justify-between items-center py-3 border-b border-gray-100">
-              <div>
-                <p className="font-medium">{tx.property}</p>
-                <p className="text-sm text-gray-500">{tx.time}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold">{tx.price}</p>
-                <span className={`px-2 py-1 rounded text-xs ${
-                  tx.status === 'Sold' ? 'bg-green-100 text-green-800' :
-                  tx.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-blue-100 text-blue-800'
-                }`}>
-                  {tx.status}
-                </span>
-              </div>
-            </div>
-          ))}
+  <h4 className="text-lg font-semibold mb-4">Recent Transaction Activity</h4>
+  <div className="space-y-4">
+    {properties
+      .slice() // copy array
+      .sort((a, b) => new Date(b.listingDate).getTime() - new Date(a.listingDate).getTime()) // newest first
+      .map((property) => (
+        <div key={property.id} className="flex justify-between items-center py-3 border-b border-gray-100">
+          <div>
+            <p className="font-medium">{property.title}</p>
+            <p className="text-sm text-gray-500">
+              {formatDistanceToNow(new Date(property.listingDate), { addSuffix: true })}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-semibold">{(property.price / 1e6).toLocaleString()} ALGO</p>
+            <span
+              className={`px-2 py-1 rounded text-xs ${
+                property.status === 'sold' ? 'bg-green-100 text-green-800' :
+                property.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-blue-100 text-blue-800'
+              }`}
+            >
+              {property.status.charAt(0).toUpperCase() + property.status.slice(1)}
+            </span>
+          </div>
         </div>
+      ))}
+  </div>
       </div>
     </div>
   );
@@ -409,10 +469,14 @@ const RealEstateApp: React.FC = () => {
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <Home className="w-8 h-8 text-blue-600" />
+              <img 
+    src="/logo.png" 
+    alt="Pstate Logo" 
+    className="w-10 h-10 object-contain"
+  />
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">RealChain</h1>
-                <p className="text-sm text-gray-600">Trustless Real Estate on Algorand</p>
+                <h1 className="text-2xl font-bold text-gray-800">Pstate</h1>
+                <p className="text-sm text-gray-600">Where Trust Finds a Home</p>
               </div>
             </div>
 
@@ -507,7 +571,7 @@ const RealEstateApp: React.FC = () => {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-sm text-gray-500">
-            <p>&copy; 2025 RealChain. Powered by Algorand. Built for the future of real estate.</p>
+            <p>&copy; 2025 Pstate. Where Trust Finds a Home. Powered by Algorand. Built for the future of real estate.</p>
           </div>
         </div>
       </footer>

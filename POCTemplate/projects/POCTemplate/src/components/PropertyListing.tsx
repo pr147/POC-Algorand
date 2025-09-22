@@ -43,7 +43,8 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
 }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [showPriceAnalytics, setShowPriceAnalytics] = useState(false);
+  const [analyticsPropertyId, setAnalyticsPropertyId] = useState<number | null>(null);
+
 
   const [formData, setFormData] = useState({
     title: '',
@@ -196,10 +197,6 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-bold text-gray-800 flex items-center">
-            <Home className="w-8 h-8 mr-3 text-blue-600" />
-            Trustless Real Estate Platform
-          </h2>
           <p className="text-gray-600 mt-2">Powered by Algorand Smart Contracts</p>
         </div>
         <button
@@ -350,17 +347,23 @@ const PropertyListing: React.FC<PropertyListingProps> = ({
 
               {/* Price Analytics Toggle */}
               <button
-                onClick={() => setShowPriceAnalytics(!showPriceAnalytics)}
+                onClick={() =>
+                  setAnalyticsPropertyId(
+                    analyticsPropertyId === property.id ? null : property.id
+                  )
+                }
                 className="w-full mb-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all font-semibold"
               >
-                {showPriceAnalytics ? 'Hide' : 'Show'} AI Price Analytics ✨
+                {analyticsPropertyId === property.id ? 'Hide' : 'Show'} AI Price Analytics ✨
               </button>
 
-              {showPriceAnalytics && (
+
+              {analyticsPropertyId === property.id && (
                 <div className="mb-4">
                   <PriceAnalytics property={property} />
                 </div>
               )}
+
 
               {/* Smart Contract Info */}
               <div className="bg-gray-50 p-3 rounded-lg mb-4 text-sm">
